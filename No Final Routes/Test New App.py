@@ -900,7 +900,7 @@ for d in days:
     total_cost_week += result[d]['Total cost']
     total_pallets_electric += np.sum(result[d]['Direct trucks electric full']) * truck_capacity_electric
     too_late_final_routes += result[d]['Too late']
-    
+
 # Calculate KPIs
 avg_pallet_cost = np.round(total_cost_week / total_pallets_week, 2)
 service_level = np.round((total_pallets_week - too_late_foe - too_late_final_routes) / total_pallets_week * 100, 2)

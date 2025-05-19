@@ -67,7 +67,7 @@ km_range = st.slider(
     value=75,
     key="km_slider"
 )
-st.markdown(f"<h3>The Chosen KM Range is: {km_range} km</h3>", unsafe_allow_html=True)
+st.markdown(f"<h3>The Chosen Kilometer Range is: {km_range} km</h3>", unsafe_allow_html=True)
 
 
 minimum_load_diesel = 22 # Accept direct deliveries from this amount of pallets
