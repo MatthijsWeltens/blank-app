@@ -13,7 +13,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 st.markdown(
     """
     <style>
@@ -28,7 +27,6 @@ st.markdown(
     '<h1 style="color:#D40511; text-align: center;">KPIs Linehaul Planning</h1>',
     unsafe_allow_html=True
 )
-
 
 #Code
 import numpy as np
@@ -64,13 +62,14 @@ max_route_time = 195 # 195 + 30 + 195 minutes = 7 hours
 st.markdown('<div class="custom-slider-label">Select the maximum kilometer range of electric trucks</div>', unsafe_allow_html=True)
 
 km_range = st.slider(
-    label=" ",  # Lege string om label weg te laten
+    label=" ",
     min_value=0,
     max_value=250,
     step=5,
     value=75,
     key="km_slider"
 )
+st.markdown(f"<h3>The Chosen Kilometer Range is: {km_range} km</h3>", unsafe_allow_html=True)
 minimum_load_diesel = 22 # Accept direct deliveries from this amount of pallets
 cross_dock_possible_loc = ['EIN', 'UTR']
 cross_dock_possible_id = [terminal_ids.index(t) for t in cross_dock_possible_loc]
@@ -926,7 +925,7 @@ import plotly.graph_objects as go
 
 # --- Create pie charts
 fig_service = go.Figure(go.Pie(
-    values=[service_level, 100 - service_level],
+    values=[round(service_level, 1), round(100 - service_level, 1)],
     labels=['Within Limit', 'Out of Limit'],
     hole=0.6,
     marker=dict(colors=[dhl_red, '#E0E0E0']),
@@ -940,13 +939,15 @@ fig_service.update_layout(
     margin=dict(t=0, b=0, l=0, r=0),
 )
 
+texttemplate='%{percent:.1f}%',
+rounded_pct = round(pct_pallets_electric, 1)
 fig_electric = go.Figure(go.Pie(
-    values=[pct_pallets_electric, 100 - pct_pallets_electric],
+    values = [rounded_pct, 100 - rounded_pct],
     labels=['Electric', 'Diesel'],
     hole=0.6,
-    sort=False,  # ➤ respecteer volgorde
-    direction='clockwise',  # ➤ start rechtsom
-    rotation=0,  # ➤ start bij 12 uur (bovenaan)
+    sort=False,
+    direction='clockwise',
+    rotation=0,
     marker=dict(colors=[light_green, '#E0E0E0']),
     textinfo='percent',
     textfont_size=28
@@ -969,4 +970,3 @@ with col1:
 with col2:
     st.plotly_chart(fig_electric, use_container_width=True)
     st.markdown('<div style="text-align:center; color:black; font-size:28px;">Percentage Pallets Electric</div>', unsafe_allow_html=True)
-
