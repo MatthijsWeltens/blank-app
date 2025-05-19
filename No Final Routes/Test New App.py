@@ -13,6 +13,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
 st.markdown(
     """
     <style>
@@ -47,6 +48,7 @@ cost_per_hour = 40
 # Terminals
 terminal_ids = ["ALK", "AME", "AMS", "ANT", "ARN", "AWS", "BEE", "DRA", "EIN", "FOE", "GRA",
                 "GUL", "HEN", "HER", "OUD", "ROO", "ROT", "SVC", "TER", "UTR", "ZLB", "ZWO"]
+
 n = len(terminal_ids)
 
 loading_and_unloading_cost = 0.67 # Cost per pallet, because one pallets takes 1 minute
@@ -60,16 +62,13 @@ max_route_time = 195 # 195 + 30 + 195 minutes = 7 hours
 st.markdown('<div class="custom-slider-label">Select the maximum kilometer range of electric trucks</div>', unsafe_allow_html=True)
 
 km_range = st.slider(
-    label=" ",
+    label=" ",  # Lege string om label weg te laten
     min_value=0,
     max_value=250,
     step=5,
     value=75,
     key="km_slider"
 )
-st.markdown(f"<h3>The Chosen KM Range is: {km_range} km</h3>", unsafe_allow_html=True)
-
-
 minimum_load_diesel = 22 # Accept direct deliveries from this amount of pallets
 cross_dock_possible_loc = ['EIN', 'UTR']
 cross_dock_possible_id = [terminal_ids.index(t) for t in cross_dock_possible_loc]
@@ -105,7 +104,7 @@ ein_i_from_yesterday = np.array([
        0., 5., 0., 0., 6.],
     ], dtype=int)
 
-too_late = sum(ein_foe_from_yesterday) + np.sum(ein_i_from_yesterday)
+too_late_foe = sum(ein_foe_from_yesterday) + np.sum(ein_i_from_yesterday)
 
 #%% Helper Functions
 
@@ -514,6 +513,12 @@ def find_best_grouping(remaining_demand):
 
 result = {}
 
+# Load the final route pallets from friday such that we add the to the monday demand
+# For the rest of the days the final route pallets are carried over within the loop
+# Load the array back from the file
+final_route_pallets_friday = np.load('final_route_pallets_friday.npy')
+remaining_demand_day = final_route_pallets_friday
+
 # Loop through the days
 for d in range(len(days)):
     
@@ -522,6 +527,11 @@ for d in range(len(days)):
     
     total_demand_day = np.sum(demand_day)
     result_day['Total demand'] = total_demand_day
+    
+    # The remaining final route pallets of day before are added here such that they are handled by the direct routes
+    # This are the pallets that are 'too late'
+    demand_day += remaining_demand_day
+    result_day['Too late'] = np.sum(remaining_demand_day)
     
     ########################### 1. FOE ################################
 
@@ -875,53 +885,9 @@ for d in range(len(days)):
     result_day['Cross dock total cost'] = total_cost_cross_dock
     result_day['Average cost cross dock'] = total_cost_cross_dock / np.sum(cross_dock_pallets)
 
-    ########################### 5. Final routes ###################################
+    # Compute total costs costs
+    total_cost = total_FOE_cost + total_cost_direct + total_cost_cross_dock
     
-    # Call the function to find the best groupings
-    routes = find_best_grouping(remaining_demand_day)
-        
-    # Save results in dictionairy
-    optimal_routes_final = {}
-    
-    for destination, best_combination, _, _ in routes:
-        dest_idx = terminal_ids.index(destination)
-        
-        # Extract the pallet array for this destination
-        pallets_for_dest = remaining_demand_day[:, dest_idx]
-        
-        for route_num, group in enumerate(best_combination, start=1):
-            # 1) Solve TSP to get the best origin order (no depot yet)
-            best_order, _ = solve_tsp_exact(group, dest_idx, remaining_demand_day)
-            # 2) Append the depot at the end
-            best_order.append(dest_idx)
-    
-            # 3) Map to names
-            stops = [terminal_ids[i] for i in best_order]
-    
-            # 4) Compute time (travel + loading)
-            tt = route_time(best_order, df_time, pallets_for_dest, cross_dock_index)
-    
-            # 5) Compute cost & get pallet count back
-            cost, num_pallets = route_cost(best_order, df_km, df_time, pallets_for_dest, cross_dock_index)
-    
-            # 6) Store in dict
-            key = f"{destination} Route {route_num}"
-            optimal_routes_final[key] = {
-                "stops":  stops,
-                "pallets": num_pallets,
-                "time":   tt,
-                "cost":   cost
-            }
-     
-    # Compute costs
-    total_cost_final_routes = sum([route[3] for route in routes])
-    total_cost = total_FOE_cost + total_cost_direct + total_cost_cross_dock + total_cost_final_routes
-    
-    # Save results
-    result_day['Optimal routes final'] = optimal_routes_final
-    result_day['Final route pallets'] = remaining_demand_day
-    result_day['Final route total cost'] = total_cost_final_routes
-    result_day['Average cost final route'] = total_cost_final_routes / np.sum(remaining_demand_day)
     result_day['Total cost'] = total_cost
     result_day['Average cost'] = total_cost / total_demand_day
     result[days[d]] = result_day
@@ -930,13 +896,16 @@ for d in range(len(days)):
 total_pallets_week = 0
 total_cost_week = 0
 total_pallets_electric = 0
+too_late_final_routes = 0
 for d in days:
     total_pallets_week += np.sum(result[d]['Total demand'])
     total_cost_week += result[d]['Total cost']
     total_pallets_electric += np.sum(result[d]['Direct trucks electric full']) * truck_capacity_electric
+    too_late_final_routes += result[d]['Too late']
+
 # Calculate KPIs
 avg_pallet_cost = np.round(total_cost_week / total_pallets_week, 2)
-service_level = np.round((total_pallets_week - too_late) / total_pallets_week * 100, 2)
+service_level = np.round((total_pallets_week - too_late_foe - too_late_final_routes) / total_pallets_week * 100, 2)
 pct_pallets_electric = np.round(total_pallets_electric / total_pallets_week * 100, 2)
 
 # --- Background color (DHL yellow)
@@ -959,7 +928,7 @@ import plotly.graph_objects as go
 
 # --- Create pie charts
 fig_service = go.Figure(go.Pie(
-    values=[round(service_level, 1), round(100 - service_level, 1)],
+    values=[service_level, 100 - service_level],
     labels=['Within Limit', 'Out of Limit'],
     hole=0.6,
     marker=dict(colors=[dhl_red, '#E0E0E0']),
@@ -973,15 +942,13 @@ fig_service.update_layout(
     margin=dict(t=0, b=0, l=0, r=0),
 )
 
-texttemplate='%{percent:.1f}%',
-rounded_pct = round(pct_pallets_electric, 1)
 fig_electric = go.Figure(go.Pie(
-    values = [rounded_pct, 100 - rounded_pct],
+    values=[pct_pallets_electric, 100 - pct_pallets_electric],
     labels=['Electric', 'Diesel'],
     hole=0.6,
-    sort=False,
-    direction='clockwise',
-    rotation=0,
+    sort=False,  # ➤ respecteer volgorde
+    direction='clockwise',  # ➤ start rechtsom
+    rotation=0,  # ➤ start bij 12 uur (bovenaan)
     marker=dict(colors=[light_green, '#E0E0E0']),
     textinfo='percent',
     textfont_size=28
@@ -1005,5 +972,3 @@ with col2:
     st.plotly_chart(fig_electric, use_container_width=True)
     st.markdown('<div style="text-align:center; color:black; font-size:28px;">Percentage Pallets Electric</div>', unsafe_allow_html=True)
 
-final_route_pallets_friday = result['Friday']['Final route pallets']
-np.save('final_route_pallets_friday.npy', final_route_pallets_friday)
