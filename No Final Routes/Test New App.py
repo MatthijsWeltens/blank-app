@@ -36,6 +36,8 @@ import pandas as pd
 from itertools import combinations, permutations
 import random
 import math
+from collections import defaultdict, deque
+import matplotlib.pyplot as plt
 
 # Parameters
 truck_capacity_diesel = 26
@@ -513,11 +515,7 @@ def find_best_grouping(remaining_demand):
 
 result = {}
 
-# Load the final route pallets from friday such that we add the to the monday demand
-# For the rest of the days the final route pallets are carried over within the loop
-# Load the array back from the file
-final_route_pallets_friday = np.load('final_route_pallets_friday.npy')
-remaining_demand_day = final_route_pallets_friday
+remaining_demand_day = 0 # On friday we delivered everything using final routes, hence nothing left on friday
 
 # Loop through the days
 for d in range(len(days)):
@@ -894,7 +892,7 @@ for d in range(len(days)):
 
 # Aggregate days
 total_pallets_week = 0
-total_cost_week = 0
+total_cost_week = 3967.42 # 326 pallets times 12.17 per pallet
 total_pallets_electric = 0
 too_late_final_routes = 0
 for d in days:
@@ -902,7 +900,7 @@ for d in days:
     total_cost_week += result[d]['Total cost']
     total_pallets_electric += np.sum(result[d]['Direct trucks electric full']) * truck_capacity_electric
     too_late_final_routes += result[d]['Too late']
-
+    
 # Calculate KPIs
 avg_pallet_cost = np.round(total_cost_week / total_pallets_week, 2)
 service_level = np.round((total_pallets_week - too_late_foe - too_late_final_routes) / total_pallets_week * 100, 2)
