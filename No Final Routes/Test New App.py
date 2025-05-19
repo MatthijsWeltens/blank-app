@@ -69,7 +69,7 @@ km_range = st.slider(
     value=75,
     key="km_slider"
 )
-st.markdown(f"<h3>The Chosen Kilometer Range is: {km_range} km</h3>", unsafe_allow_html=True)
+st.subheader(f"The Chosen Kilometer Range is: {km_range} km")
 minimum_load_diesel = 22 # Accept direct deliveries from this amount of pallets
 cross_dock_possible_loc = ['EIN', 'UTR']
 cross_dock_possible_id = [terminal_ids.index(t) for t in cross_dock_possible_loc]
